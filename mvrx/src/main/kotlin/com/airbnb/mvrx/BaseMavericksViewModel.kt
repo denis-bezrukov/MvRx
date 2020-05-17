@@ -11,6 +11,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.dropWhile
@@ -63,6 +64,8 @@ abstract class BaseMavericksViewModel<S : MvRxState>(
     private val tag by lazy { javaClass.simpleName }
     private val mutableStateChecker = if (debugMode) MutableStateChecker(initialState) else null
 
+    private val copyHelper by lazy { CopyHelper(initialState.javaClass) }
+
     /**
      * Synchronous access to state is not exposed externally because there is no guarantee that
      * all setState reducers have run yet.
@@ -91,6 +94,33 @@ abstract class BaseMavericksViewModel<S : MvRxState>(
     @CallSuper
     open fun onCleared() {
         viewModelScope.cancel()
+    }
+
+    fun <T> Flow<T>.execute(prop: KProperty1<S, Async<T>>) {
+        execute { value ->
+            copyHelper.copy(this, prop, value)
+        }
+    }
+
+    fun <T> Flow<T>.onEachSet(prop: KProperty1<S, T>) {
+        viewModelScope.launch {
+            collect { value ->
+                setState { copyHelper.copy(this, prop, value) }
+            }
+        }
+    }
+
+    fun <T> Flow<T>.execute(stateReducer: S.(Async<T>) -> S) {
+        setState { stateReducer(Loading()) }
+        viewModelScope.launch {
+            try {
+                collect { value ->
+                    setState { stateReducer(Success(value)) }
+                }
+            } catch (e: Exception) {
+                setState { stateReducer(Fail(e)) }
+            }
+        }
     }
 
     /**
@@ -253,8 +283,8 @@ abstract class BaseMavericksViewModel<S : MvRxState>(
     ) = stateFlow
         .map { MvRxTuple1(prop1.get(it)) }
         .distinctUntilChanged()
-        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1)) {
-            (a) -> action(a)
+        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1)) { (a) ->
+            action(a)
         }
 
     @RestrictTo(RestrictTo.Scope.LIBRARY)
@@ -267,8 +297,8 @@ abstract class BaseMavericksViewModel<S : MvRxState>(
     ) = stateFlow
         .map { MvRxTuple2(prop1.get(it), prop2.get(it)) }
         .distinctUntilChanged()
-        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2)) {
-            (a, b) -> action(a, b)
+        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2)) { (a, b) ->
+            action(a, b)
         }
 
     @RestrictTo(RestrictTo.Scope.LIBRARY)
@@ -282,8 +312,8 @@ abstract class BaseMavericksViewModel<S : MvRxState>(
     ) = stateFlow
         .map { MvRxTuple3(prop1.get(it), prop2.get(it), prop3.get(it)) }
         .distinctUntilChanged()
-        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2, prop3)) {
-            (a, b, c) -> action(a, b, c)
+        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2, prop3)) { (a, b, c) ->
+            action(a, b, c)
         }
 
     @RestrictTo(RestrictTo.Scope.LIBRARY)
@@ -298,8 +328,8 @@ abstract class BaseMavericksViewModel<S : MvRxState>(
     ) = stateFlow
         .map { MvRxTuple4(prop1.get(it), prop2.get(it), prop3.get(it), prop4.get(it)) }
         .distinctUntilChanged()
-        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2, prop3, prop4)) {
-            (a, b, c, d) -> action(a, b, c, d)
+        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2, prop3, prop4)) { (a, b, c, d) ->
+            action(a, b, c, d)
         }
 
     @RestrictTo(RestrictTo.Scope.LIBRARY)
@@ -315,8 +345,8 @@ abstract class BaseMavericksViewModel<S : MvRxState>(
     ) = stateFlow
         .map { MvRxTuple5(prop1.get(it), prop2.get(it), prop3.get(it), prop4.get(it), prop5.get(it)) }
         .distinctUntilChanged()
-        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2, prop3, prop4, prop5)) {
-            (a, b, c, d, e) -> action(a, b, c, d, e)
+        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2, prop3, prop4, prop5)) { (a, b, c, d, e) ->
+            action(a, b, c, d, e)
         }
 
     @RestrictTo(RestrictTo.Scope.LIBRARY)
@@ -333,8 +363,8 @@ abstract class BaseMavericksViewModel<S : MvRxState>(
     ) = stateFlow
         .map { MvRxTuple6(prop1.get(it), prop2.get(it), prop3.get(it), prop4.get(it), prop5.get(it), prop6.get(it)) }
         .distinctUntilChanged()
-        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2, prop3, prop4, prop5, prop6)) {
-            (a, b, c, d, e, f) -> action(a, b, c, d, e, f)
+        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2, prop3, prop4, prop5, prop6)) { (a, b, c, d, e, f) ->
+            action(a, b, c, d, e, f)
         }
 
     @RestrictTo(RestrictTo.Scope.LIBRARY)
@@ -352,8 +382,8 @@ abstract class BaseMavericksViewModel<S : MvRxState>(
     ) = stateFlow
         .map { MvRxTuple7(prop1.get(it), prop2.get(it), prop3.get(it), prop4.get(it), prop5.get(it), prop6.get(it), prop7.get(it)) }
         .distinctUntilChanged()
-        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2, prop3, prop4, prop5, prop6, prop7)) {
-            (a, b, c, d, e, f, g) -> action(a, b, c, d, e, f, g)
+        .resolveSubscription(owner, deliveryMode.appendPropertiesToId(prop1, prop2, prop3, prop4, prop5, prop6, prop7)) { (a, b, c, d, e, f, g) ->
+            action(a, b, c, d, e, f, g)
         }
 
     @RestrictTo(RestrictTo.Scope.LIBRARY)
