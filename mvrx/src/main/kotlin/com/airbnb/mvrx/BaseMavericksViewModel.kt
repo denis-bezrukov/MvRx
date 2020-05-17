@@ -96,16 +96,18 @@ abstract class BaseMavericksViewModel<S : MvRxState>(
         viewModelScope.cancel()
     }
 
-    fun <T> Flow<T>.execute(prop: KProperty1<S, Async<T>>) {
+    fun <T> Flow<T>.execute(prop: KProperty1<S, Async<T>>, retainValue: Boolean = false) {
         execute { value ->
-            copyHelper.copy(this, prop, value)
-        }
-    }
-
-    fun <T> Flow<T>.onEachSet(prop: KProperty1<S, T>) {
-        viewModelScope.launch {
-            collect { value ->
-                setState { copyHelper.copy(this, prop, value) }
+            if (retainValue) {
+                val currentAsync = prop.get(this)
+                copyHelper.copy(this, prop, when (value) {
+                    is Uninitialized -> Uninitialized
+                    is Loading -> Loading(currentAsync())
+                    is Success -> value
+                    is Fail -> Fail(value.error, currentAsync())
+                })
+            } else {
+                copyHelper.copy(this, prop, value)
             }
         }
     }
