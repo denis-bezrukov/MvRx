@@ -30,7 +30,6 @@ jacoco {
 }
 
 dependencies {
-    api Libraries.rxAndroid
     api Libraries.kotlinCoroutines
 
     implementation Libraries.appcompat
